@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use rand::Rng;
 
 fn main() {
     App::new()
@@ -49,10 +50,13 @@ fn animate_sprite(
 
 fn player_movement(
     mut player_query: Query<(&mut Transform, &mut MovingRight, &Speed), With<Player>>,
+    mut camera_query: Query<&mut Transform, (With<Camera2d>, Without<Player>)>,
     time: Res<Time>,
     keys: Res<ButtonInput<KeyCode>>,
 ) {
     let (mut player_transform, mut moving_right, speed) = player_query.single_mut();
+
+    let mut camera_transform = camera_query.single_mut();
 
     let mut direction = Vec2::ZERO;
 
@@ -78,6 +82,8 @@ fn player_movement(
     ) * speed.0
         * time.delta_seconds()
         * 100.0;
+
+    camera_transform.translation = player_transform.translation;
 }
 
 fn setup(
@@ -91,6 +97,46 @@ fn setup(
     // Use only the subset of sprites in the sheet that make up the run animation
     let animation_indices = AnimationIndices { first: 1, last: 6 };
     commands.spawn(Camera2dBundle::default());
+
+    let terrain_sprites = [
+        "back1.png",
+        "back2.png",
+        "back3.png",
+        "grass1.png",
+        "grass2.png",
+        "grass3.png",
+    ];
+
+    let mut rng = rand::thread_rng();
+
+    for x in -100..100 {
+        for y in -100..100 {
+            let random_number = rng.gen_range(0..5);
+
+            let randrot = rng.gen::<bool>();
+
+            let mut rotx = if randrot { 0.0 } else { 1.0 };
+            let mut roty = if randrot { 1.0 } else { 0.0 };
+
+            if random_number > 2 {
+                rotx = 0.0;
+                roty = 0.0;
+            }
+
+            commands.spawn(SpriteBundle {
+                texture: asset_server
+                    .load(String::from("textures/terrain/") + terrain_sprites[random_number]),
+                transform: Transform {
+                    scale: Vec3::new(3.0, 3.0, 3.0),
+                    translation: Vec3::new(x as f32 * 32.0 * 3.0, y as f32 * 32.0 * 3.0, -10.0),
+                    rotation: Quat::from_xyzw(rotx, roty, 0.0, 0.0),
+                    ..default()
+                },
+                ..default()
+            });
+        }
+    }
+
     commands.spawn((
         SpriteSheetBundle {
             texture,
