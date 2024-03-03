@@ -1,11 +1,15 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, window::WindowResized};
 use rand::Rng;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest())) // prevents blurry sprites
+        .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
+        .insert_resource(WindowSize(Vec2::new(100.0, 100.0))) // prevents blurry sprites
         .add_systems(Startup, setup)
-        .add_systems(Update, (animate_sprite, player_movement))
+        .add_systems(
+            Update,
+            (animate_sprite, player_movement, resize_notificator),
+        )
         .run();
 }
 
@@ -13,7 +17,13 @@ fn main() {
 struct Player;
 
 #[derive(Component)]
+struct Stick(Vec3);
+
+#[derive(Component)]
 struct Speed(f32);
+
+#[derive(Resource)]
+struct WindowSize(Vec2);
 
 #[derive(Component)]
 struct MovingRight(bool);
@@ -26,6 +36,17 @@ struct AnimationIndices {
 
 #[derive(Component, Deref, DerefMut)]
 struct AnimationTimer(Timer);
+
+fn resize_notificator(
+    mut window_size: ResMut<WindowSize>,
+    resize_event: Res<Events<WindowResized>>,
+) {
+    let mut reader = resize_event.get_reader();
+    for e in reader.read(&resize_event) {
+        window_size.0.x = e.width;
+        window_size.0.y = e.height;
+    }
+}
 
 fn animate_sprite(
     time: Res<Time>,
@@ -51,8 +72,14 @@ fn animate_sprite(
 fn player_movement(
     mut player_query: Query<(&mut Transform, &mut MovingRight, &Speed), With<Player>>,
     mut camera_query: Query<&mut Transform, (With<Camera2d>, Without<Player>)>,
+    mut stick_query: Query<
+        (&mut Transform, &mut Stick),
+        (With<Stick>, Without<Player>, Without<Camera2d>),
+    >,
     time: Res<Time>,
     keys: Res<ButtonInput<KeyCode>>,
+    mut cursor_evr: EventReader<CursorMoved>,
+    window_size: Res<WindowSize>,
 ) {
     let (mut player_transform, mut moving_right, speed) = player_query.single_mut();
 
@@ -84,6 +111,19 @@ fn player_movement(
         * 100.0;
 
     camera_transform.translation = player_transform.translation;
+
+    let (mut stick_transform, mut stick) = stick_query.single_mut();
+
+    for ev in cursor_evr.read() {
+        let diffx = (window_size.0.x / 2.0) - ev.position.x;
+        let diffy = (window_size.0.y / 2.0) - ev.position.y;
+
+        stick.0 = Vec3::new(-diffx, diffy, 0.0).normalize();
+    }
+
+    stick_transform.translation = player_transform.translation + stick.0 * 100.0;
+
+    stick_transform.rotation = Quat::from_rotation_arc(Vec3::new(0.0, 1.0, 0.0), stick.0);
 }
 
 fn setup(
@@ -97,6 +137,18 @@ fn setup(
     // Use only the subset of sprites in the sheet that make up the run animation
     let animation_indices = AnimationIndices { first: 1, last: 6 };
     commands.spawn(Camera2dBundle::default());
+
+    commands.spawn((
+        SpriteBundle {
+            texture: asset_server.load("textures/characters/stick.png"),
+            transform: Transform {
+                scale: Vec3::new(3.0, 3.0, 3.0),
+                ..default()
+            },
+            ..default()
+        },
+        Stick(Vec3::ZERO),
+    ));
 
     let terrain_sprites = [
         "back1.png",
