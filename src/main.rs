@@ -1,4 +1,4 @@
-use bevy::{prelude::*, window::WindowResized};
+use bevy::{asset::io::memory::Dir, prelude::*, reflect::Enum, window::WindowResized};
 use rand::Rng;
 use std::cmp::Ordering;
 
@@ -11,9 +11,23 @@ fn main() {
         .add_systems(Startup, (setup, setup_ui))
         .add_systems(
             Update,
-            (animate_sprite, player_movement, entity_movement_update, object_position_update, camera_update),
+            (
+                animate_sprite,
+                player_movement,
+                entity_movement_update,
+                object_position_update,
+                camera_update,
+                resize_notificator,
+            ),
         )
         .run();
+}
+
+enum Direction {
+    NORTH,
+    EAST,
+    SOUTH,
+    WEST,
 }
 
 #[derive(Component)]
@@ -27,6 +41,9 @@ struct Projectile;
 
 #[derive(Component)]
 struct Health(f32);
+
+#[derive(Component)]
+struct Facing(Direction);
 
 //Knockback, projectile, etc.
 #[derive(Component)]
@@ -67,53 +84,54 @@ fn resize_notificator(
 fn animate_sprite(
     time: Res<Time>,
     mut query: Query<(&AnimationIndices, &mut AnimationTimer, &mut TextureAtlas)>,
-    mut player_query: Query<(&mut Sprite, &Velocity), With<Player>>,
+    mut player_query: Query<(&mut Sprite, &MovementVelocity, &Facing), With<Player>>,
 ) {
-    for (indices, mut timer, mut atlas) in &mut query {
-        timer.tick(time.delta());
-        if timer.just_finished() {
-            atlas.index = if atlas.index == indices.last {
-                indices.first
-            } else {
-                atlas.index + 1
-            };
+    let (mut sprite, velocity, facing) = player_query.single_mut();
+
+    if velocity.0 == Vec3::ZERO {
+        for (_, _, mut atlas) in &mut query {
+            atlas.index = 0;
+        }
+    } else {
+        for (indices, mut timer, mut atlas) in &mut query {
+            timer.tick(time.delta());
+            if timer.just_finished() {
+                atlas.index = if atlas.index == indices.last {
+                    indices.first
+                } else {
+                    atlas.index + 1
+                };
+            }
         }
     }
 
-    let (mut sprite, velocity) = player_query.single_mut();
-    match velocity.0.x.partial_cmp(&0.0) {
-        Some(Ordering::Greater) => sprite.flip_x = true,
-        _ => sprite.flip_x = false
+    println!("{}", velocity.0.x);
+    match facing.0 {
+        Direction::EAST => sprite.flip_x = false,
+        Direction::WEST => sprite.flip_x = true,
+        _ => (),
     }
 }
 
 fn entity_movement_update(
     time: Res<Time>,
-    mut entity_query: Query<(&MovementVelocity, &mut Transform), With<MovementVelocity>> 
+    mut entity_query: Query<(&MovementVelocity, &mut Transform), With<MovementVelocity>>,
 ) {
     let (velocity, mut transform) = entity_query.single_mut();
-    transform.translation += Vec3::new(
-        velocity.0.x,
-        velocity.0.y,
-        0.0
-    ) * time.delta_seconds();
+    transform.translation += Vec3::new(velocity.0.x, velocity.0.y, 0.0) * time.delta_seconds();
 }
 
 fn object_position_update(
     time: Res<Time>,
-    mut object_query: Query<(&Velocity, &mut Transform), (With<Velocity>)>
+    mut object_query: Query<(&Velocity, &mut Transform), With<Velocity>>,
 ) {
     let (velocity, mut transform) = object_query.single_mut();
-    transform.translation += Vec3::new(
-        velocity.0.x,
-        velocity.0.y,
-        0.0
-    ) * time.delta_seconds();
+    transform.translation += Vec3::new(velocity.0.x, velocity.0.y, 0.0) * time.delta_seconds();
 }
 
 fn camera_update(
     mut player_query: Query<&Transform, With<Player>>,
-    mut camera_query: Query<&mut Transform, (With<Camera2d>, Without<Player>)>
+    mut camera_query: Query<&mut Transform, (With<Camera2d>, Without<Player>)>,
 ) {
     let player_transform = player_query.single_mut();
     let mut camera_transform = camera_query.single_mut();
@@ -122,23 +140,27 @@ fn camera_update(
 }
 
 fn player_movement(
-    mut player_query: Query<&mut MovementVelocity, With<Player>>,
-    keys: Res<ButtonInput<KeyCode>>
+    mut player_query: Query<(&mut MovementVelocity, &mut Facing), With<Player>>,
+    keys: Res<ButtonInput<KeyCode>>,
 ) {
-    let mut velocity = player_query.single_mut();
+    let (mut velocity, mut facing) = player_query.single_mut();
 
     let mut direction = Vec3::ZERO;
     if keys.pressed(KeyCode::KeyW) {
         direction.y += 1.0;
+        //facing.0 = Direction::NORTH;
     }
     if keys.pressed(KeyCode::KeyS) {
         direction.y -= 1.0;
+        //facing.0 = Direction::SOUTH;
     }
     if keys.pressed(KeyCode::KeyA) {
         direction.x -= 1.0;
+        facing.0 = Direction::WEST;
     }
     if keys.pressed(KeyCode::KeyD) {
         direction.x += 1.0;
+        facing.0 = Direction::EAST;
     }
 
     velocity.0 = direction.normalize_or_zero() * PLAYER_SPEED;
@@ -279,7 +301,8 @@ fn setup(
         Player,
         Health(5.0),
         Velocity(Vec3::ZERO),
-        MovementVelocity(Vec3::ZERO)
+        MovementVelocity(Vec3::ZERO),
+        Facing(Direction::EAST),
     ));
 }
 
@@ -310,33 +333,33 @@ fn setup_ui(mut commands: Commands) {
                 })
                 .with_children(|parent| {
                     for i in 0..8 {
-                        parent.spawn(NodeBundle {
-                            style: Style {
-                                margin: UiRect {
-                                    top: Val::Auto,
-                                    bottom: Val::Auto,
-                                    left: Val::Px(10.0),
-                                    right: Val::Px(10.0),
+                        parent
+                            .spawn(NodeBundle {
+                                style: Style {
+                                    margin: UiRect {
+                                        top: Val::Auto,
+                                        bottom: Val::Auto,
+                                        left: Val::Px(10.0),
+                                        right: Val::Px(10.0),
+                                    },
+                                    width: Val::Px(50.0),
+                                    height: Val::Px(50.0),
+                                    align_items: AlignItems::Center,
+                                    justify_content: JustifyContent::Center,
+                                    ..default()
                                 },
-                                width: Val::Px(50.0),
-                                height: Val::Px(50.0),
-                                align_items: AlignItems::Center,
-                                justify_content: JustifyContent::Center,
+                                background_color: Color::rgb(0.50, 0.50, 0.50).into(),
                                 ..default()
-                            },
-                            background_color: Color::rgb(0.50, 0.50, 0.50).into(),
-                            ..default()
-                        }).with_children(|parent| {
-                            parent.spawn((
-                                TextBundle::from_section(
+                            })
+                            .with_children(|parent| {
+                                parent.spawn((TextBundle::from_section(
                                     format!("{i}"),
                                     TextStyle {
                                         font_size: 20.,
                                         ..default()
                                     },
-                                ),
-                            ));
-                        });
+                                ),));
+                            });
                     }
                 });
         });
