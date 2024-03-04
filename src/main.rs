@@ -1,12 +1,18 @@
-use bevy::{asset::io::memory::Dir, prelude::*, reflect::Enum, window::WindowResized};
+use bevy::{prelude::*, window::WindowResized};
+use player_components::Player;
 use rand::Rng;
-use std::cmp::Ordering;
+
+#[path = "camera/plugin.rs"]
+mod camera_plugin;
+
+#[path = "player/components.rs"]
+mod player_components;
 
 const PLAYER_SPEED: f32 = 1000.0;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
+        .add_plugins((DefaultPlugins.set(ImagePlugin::default_nearest()),))
         .insert_resource(WindowSize(Vec2::new(100.0, 100.0))) // prevents blurry sprites
         .add_systems(Startup, (setup, setup_ui))
         .add_systems(
@@ -16,10 +22,10 @@ fn main() {
                 player_movement,
                 entity_movement_update,
                 object_position_update,
-                camera_update,
                 resize_notificator,
             ),
         )
+        .add_plugins(camera_plugin::CameraPlugin)
         .run();
 }
 
@@ -29,9 +35,6 @@ enum Direction {
     SOUTH,
     WEST,
 }
-
-#[derive(Component)]
-struct Player;
 
 #[derive(Component)]
 struct Enemy;
@@ -127,16 +130,6 @@ fn object_position_update(
 ) {
     let (velocity, mut transform) = object_query.single_mut();
     transform.translation += Vec3::new(velocity.0.x, velocity.0.y, 0.0) * time.delta_seconds();
-}
-
-fn camera_update(
-    mut player_query: Query<&Transform, With<Player>>,
-    mut camera_query: Query<&mut Transform, (With<Camera2d>, Without<Player>)>,
-) {
-    let player_transform = player_query.single_mut();
-    let mut camera_transform = camera_query.single_mut();
-
-    camera_transform.translation = player_transform.translation;
 }
 
 fn player_movement(
