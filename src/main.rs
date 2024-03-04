@@ -5,7 +5,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
         .insert_resource(WindowSize(Vec2::new(100.0, 100.0))) // prevents blurry sprites
-        .add_systems(Startup, setup)
+        .add_systems(Startup, (setup, setup_ui))
         .add_systems(
             Update,
             (animate_sprite, player_movement, resize_notificator),
@@ -205,4 +205,63 @@ fn setup(
         Speed(5.0),
         MovingRight(true),
     ));
+}
+
+fn setup_ui(mut commands: Commands) {
+    commands
+        .spawn(NodeBundle {
+            style: Style {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                justify_content: JustifyContent::SpaceBetween,
+                ..default()
+            },
+            ..default()
+        })
+        .with_children(|parent| {
+            parent
+                .spawn(NodeBundle {
+                    style: Style {
+                        width: Val::Percent(100.0),
+                        height: Val::Px(70.0),
+                        position_type: PositionType::Absolute,
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::Center,
+                        ..default()
+                    },
+                    background_color: Color::rgb(0.15, 0.15, 0.15).into(),
+                    ..default()
+                })
+                .with_children(|parent| {
+                    for i in 0..8 {
+                        parent.spawn(NodeBundle {
+                            style: Style {
+                                margin: UiRect {
+                                    top: Val::Auto,
+                                    bottom: Val::Auto,
+                                    left: Val::Px(10.0),
+                                    right: Val::Px(10.0),
+                                },
+                                width: Val::Px(50.0),
+                                height: Val::Px(50.0),
+                                align_items: AlignItems::Center,
+                                justify_content: JustifyContent::Center,
+                                ..default()
+                            },
+                            background_color: Color::rgb(0.50, 0.50, 0.50).into(),
+                            ..default()
+                        }).with_children(|parent| {
+                            parent.spawn((
+                                TextBundle::from_section(
+                                    format!("{i}"),
+                                    TextStyle {
+                                        font_size: 20.,
+                                        ..default()
+                                    },
+                                ),
+                            ));
+                        });
+                    }
+                });
+        });
 }
