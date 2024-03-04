@@ -1,5 +1,8 @@
 use bevy::{prelude::*, window::WindowResized};
 use rand::Rng;
+use std::cmp::Ordering;
+
+const PLAYER_SPEED: f32 = 1000.0;
 
 fn main() {
     App::new()
@@ -8,7 +11,7 @@ fn main() {
         .add_systems(Startup, (setup, setup_ui))
         .add_systems(
             Update,
-            (animate_sprite, player_movement, resize_notificator),
+            (animate_sprite, player_movement, entity_movement_update, object_position_update, camera_update),
         )
         .run();
 }
@@ -17,16 +20,28 @@ fn main() {
 struct Player;
 
 #[derive(Component)]
-struct Stick(Vec3);
+struct Enemy;
 
 #[derive(Component)]
-struct Speed(f32);
+struct Projectile;
+
+#[derive(Component)]
+struct Health(f32);
+
+//Knockback, projectile, etc.
+#[derive(Component)]
+struct Velocity(Vec3);
+
+//Movement
+#[derive(Component)]
+struct MovementVelocity(Vec3);
+
+//TODO: verander
+#[derive(Component)]
+struct Stick(Vec3);
 
 #[derive(Resource)]
 struct WindowSize(Vec2);
-
-#[derive(Component)]
-struct MovingRight(bool);
 
 #[derive(Component)]
 struct AnimationIndices {
@@ -34,6 +49,7 @@ struct AnimationIndices {
     last: usize,
 }
 
+//global animation loop/timer?
 #[derive(Component, Deref, DerefMut)]
 struct AnimationTimer(Timer);
 
@@ -51,7 +67,7 @@ fn resize_notificator(
 fn animate_sprite(
     time: Res<Time>,
     mut query: Query<(&AnimationIndices, &mut AnimationTimer, &mut TextureAtlas)>,
-    mut player_query: Query<(&mut Sprite, &MovingRight), With<Player>>,
+    mut player_query: Query<(&mut Sprite, &Velocity), With<Player>>,
 ) {
     for (indices, mut timer, mut atlas) in &mut query {
         timer.tick(time.delta());
@@ -64,14 +80,73 @@ fn animate_sprite(
         }
     }
 
-    let (mut sprite, moving_right) = player_query.single_mut();
+    let (mut sprite, velocity) = player_query.single_mut();
+    match velocity.0.x.partial_cmp(&0.0) {
+        Some(Ordering::Greater) => sprite.flip_x = true,
+        _ => sprite.flip_x = false
+    }
+}
 
-    sprite.flip_x = !moving_right.0;
+fn entity_movement_update(
+    time: Res<Time>,
+    mut entity_query: Query<(&MovementVelocity, &mut Transform), With<MovementVelocity>> 
+) {
+    let (velocity, mut transform) = entity_query.single_mut();
+    transform.translation += Vec3::new(
+        velocity.0.x,
+        velocity.0.y,
+        0.0
+    ) * time.delta_seconds();
+}
+
+fn object_position_update(
+    time: Res<Time>,
+    mut object_query: Query<(&Velocity, &mut Transform), (With<Velocity>)>
+) {
+    let (velocity, mut transform) = object_query.single_mut();
+    transform.translation += Vec3::new(
+        velocity.0.x,
+        velocity.0.y,
+        0.0
+    ) * time.delta_seconds();
+}
+
+fn camera_update(
+    mut player_query: Query<&Transform, With<Player>>,
+    mut camera_query: Query<&mut Transform, (With<Camera2d>, Without<Player>)>
+) {
+    let player_transform = player_query.single_mut();
+    let mut camera_transform = camera_query.single_mut();
+
+    camera_transform.translation = player_transform.translation;
 }
 
 fn player_movement(
-    mut player_query: Query<(&mut Transform, &mut MovingRight, &Speed), With<Player>>,
-    mut camera_query: Query<&mut Transform, (With<Camera2d>, Without<Player>)>,
+    mut player_query: Query<&mut MovementVelocity, With<Player>>,
+    keys: Res<ButtonInput<KeyCode>>
+) {
+    let mut velocity = player_query.single_mut();
+
+    let mut direction = Vec3::ZERO;
+    if keys.pressed(KeyCode::KeyW) {
+        direction.y += 1.0;
+    }
+    if keys.pressed(KeyCode::KeyS) {
+        direction.y -= 1.0;
+    }
+    if keys.pressed(KeyCode::KeyA) {
+        direction.x -= 1.0;
+    }
+    if keys.pressed(KeyCode::KeyD) {
+        direction.x += 1.0;
+    }
+
+    velocity.0 = direction.normalize_or_zero() * PLAYER_SPEED;
+}
+
+/*fn player_movement(
+    mut player_query: Query<(&mut Transform, &mut MovingRight, &Velocity), With<Player>>,
+    mut camera_query: Query<&mut Transform, (With<Camera2d>)>,
     mut stick_query: Query<
         (&mut Transform, &mut Stick),
         (With<Stick>, Without<Player>, Without<Camera2d>),
@@ -124,7 +199,7 @@ fn player_movement(
     stick_transform.translation = player_transform.translation + stick.0 * 100.0;
 
     stick_transform.rotation = Quat::from_rotation_arc(Vec3::new(0.0, 1.0, 0.0), stick.0);
-}
+}*/
 
 fn setup(
     mut commands: Commands,
@@ -202,8 +277,9 @@ fn setup(
         animation_indices,
         AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
         Player,
-        Speed(5.0),
-        MovingRight(true),
+        Health(5.0),
+        Velocity(Vec3::ZERO),
+        MovementVelocity(Vec3::ZERO)
     ));
 }
 
