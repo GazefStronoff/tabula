@@ -8,7 +8,7 @@ pub fn camera_update(
     mut player_query: Query<&Transform, With<Player>>,
     mut camera_query: Query<&mut Transform, (With<Camera2d>, Without<Player>)>,
 ) {
-    let player_transform = player_query.get_single_mut().;
+    let player_transform = player_query.single_mut();
     let mut camera_transform = camera_query.single_mut();
 
     camera_transform.translation = player_transform.translation;

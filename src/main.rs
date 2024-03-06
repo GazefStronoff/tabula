@@ -216,7 +216,7 @@ fn player_movement(
     stick_transform.rotation = Quat::from_rotation_arc(Vec3::new(0.0, 1.0, 0.0), stick.0);
 }*/
 
-fn setup(
+pub fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
