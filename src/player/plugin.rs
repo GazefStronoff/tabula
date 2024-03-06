@@ -1,7 +1,8 @@
 use bevy::prelude::*;
 use systems::{animate_player, player_movement, spawn_player};
 
-mod systems;
+#[path ="./systems.rs"]
+pub mod systems;
 
 pub struct PlayerPlugin;
 

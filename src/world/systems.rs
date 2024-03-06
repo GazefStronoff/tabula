@@ -3,8 +3,7 @@ use rand::Rng;
 
 pub fn spawn_world(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
+    asset_server: Res<AssetServer>
 ) {
     let terrain_sprites = [
         "back1.png",

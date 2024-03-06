@@ -1,9 +1,9 @@
 use bevy::prelude::*;
 
 pub enum Direction {
-    NORTH,
+    //NORTH,
     EAST,
-    SOUTH,
+    //SOUTH,
     WEST,
 }
 

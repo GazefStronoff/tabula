@@ -8,10 +8,10 @@ use self::{
 };
 
 #[path = "./components.rs"]
-mod components;
+pub mod components;
 
 #[path = "../entity/components.rs"]
-mod entity_components;
+pub mod entity_components;
 
 const PLAYER_SPEED: f32 = 1000.0;
 
@@ -55,11 +55,9 @@ pub fn player_movement(
     let mut direction = Vec3::ZERO;
     if keys.pressed(KeyCode::KeyW) {
         direction.y += 1.0;
-        //facing.0 = Direction::NORTH;
     }
     if keys.pressed(KeyCode::KeyS) {
         direction.y -= 1.0;
-        //facing.0 = Direction::SOUTH;
     }
     if keys.pressed(KeyCode::KeyA) {
         direction.x -= 1.0;

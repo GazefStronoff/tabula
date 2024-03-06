@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use systems::{entity_movement_update, object_position_update};
 
-mod systems;
+pub mod systems;
 
 pub struct EntityPlugin;
 

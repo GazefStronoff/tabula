@@ -1,16 +1,16 @@
 use bevy::{prelude::*, window::WindowResized};
 
 #[path = "camera/plugin.rs"]
-mod camera_plugin;
+pub mod camera_plugin;
 
 #[path = "player/plugin.rs"]
-mod player_plugin;
+pub mod player_plugin;
 
 #[path = "world/plugin.rs"]
-mod world_plugin;
+pub mod world_plugin;
 
 #[path = "entity/plugin.rs"]
-mod entity_plugin;
+pub mod entity_plugin;
 
 #[derive(Resource)]
 pub struct WindowSize(pub Vec2);
